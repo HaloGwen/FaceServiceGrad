@@ -49,6 +49,36 @@ async def check_in(
     result = face_service.check_in(contents)
     return JSONResponse(content=result)
 
+@router.put("/update")
+async def update_face(
+    face_id: str = Form(...),  # Nhận face_id từ form
+    file: UploadFile = File(...),  # Nhận file ảnh từ form
+):
+    """
+    Update an existing face by face_id with new image data
+    """
+    contents = await file.read()
+    result = face_service.update_face(face_id, contents)
+    return JSONResponse(content=result)
+
+@router.delete("/delete-all")
+async def delete_all_faces():
+    """
+    Delete all faces from the database
+    """
+    result = face_service.delete_all_faces()
+    return JSONResponse(content=result)
+
+@router.delete("/delete")
+async def delete_face(
+    face_id: str = Form(...),  # Nhận face_id từ form
+):
+    """
+    Update an existing face by face_id with new image data
+    """
+    result = face_service.delete_face_by_id(face_id)
+    return JSONResponse(content=result)
+
 app.include_router(
     router,
     prefix="/api/v1"

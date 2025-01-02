@@ -29,8 +29,38 @@ curl -X POST "http://localhost:8001/api/v1/check-in" \
 -F "file=@path/to/image.jpg"
 ```
 
+
+# Update face
+
+```bash
+curl -X PUT "http://localhost:8001/api/v1/update" \
+-H "Content-Type: multipart/form-data" \
+-F "face_id=12345" \
+-F "file=@path/to/image.jpg"
+```
+
+# Delete face
+
+```bash
+curl -X DELETE "http://localhost:8001/api/v1/delete"
+-H "Content-Type: multipart/form-data" \
+-F "face_id=12345" \
+```
+
+# Delete all face
+
+```bash
+curl -X DELETE "http://localhost:8001/api/v1/delete-all"
+```
+
 ## Run Attu for DB Management
 
 ```bash
 docker run -p 8000:3000 -e MILVUS_URL=0.0.0.0:19530 zilliz/attu
+```
+
+## Run Serveo API
+
+```bash
+ssh -R b20dccn460.serveo.net:80:localhost:8001 serveo.net
 ```

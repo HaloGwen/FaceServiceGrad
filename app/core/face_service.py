@@ -48,10 +48,22 @@ class FaceService:
                 embedding = self.model.extract_features(image)
                 return embedding.cpu().numpy()[0]
         else:
-            raise HTTPException(status_code=400, detail="No face detected")
+            return {
+                "statusCode": 400,
+                "message": "No face detected",
+                "data": None
+            }
 
     def enroll_face(self, image_data: bytes):
-        embedding = self.extract_embedding(image_data)
+        
+        embedding_response = self.extract_embedding(image_data)
+        
+        if isinstance(embedding_response, dict):
+            if embedding_response.get("statusCode") == 400:
+                return embedding_response
+        
+        embedding = embedding_response
+
         logger.info(f"embedding length: {len(embedding)}")
 
         # Check if face already exists
@@ -65,7 +77,11 @@ class FaceService:
         logger.info(f"similarity: {results}")
         
         if results[0] and results[0][0].score > self.threshold:
-            raise HTTPException(status_code=400, detail="Face already exists in the database")
+            return {
+                "statusCode": 400,
+                "message": "Face already exists in the database",
+                "data": {"distance": results[0][0].score}
+            }
         
         # Generate unique face_id and timestamp
         face_id = str(uuid.uuid4())
@@ -79,10 +95,20 @@ class FaceService:
         ])
         collection.flush()
         
-        return {"face_id": face_id}
+        return {
+            "statusCode": 200,
+            "message": "Face enrolled successfully",
+            "data": {"face_id": face_id}
+        }
 
     def check_in(self, image_data: bytes):
-        embedding = self.extract_embedding(image_data)
+        embedding_response = self.extract_embedding(image_data)
+        
+        if isinstance(embedding_response, dict):
+            if embedding_response.get("statusCode") == 400:
+                return embedding_response
+
+        embedding = embedding_response
         logger.info(f"embedding length: {len(embedding)}")
 
         collection = Collection("face_embeddings")
@@ -96,13 +122,105 @@ class FaceService:
         logger.info(f"similarity: {results}")
         
         if not results[0] or results[0][0].score < self.threshold:
-            return {"matched": False, "message": "No matching face found"}
+            return {
+                "statusCode": 400,
+                "message": "No matching face found",
+                "data": {"Distance nearly": results[0][0].score}
+            }
         
         match = results[0][0]
         face_id = match.entity.get('face_id')
         
         return {
-            "matched": True,
-            "face_id": face_id,
-            "similarity": float(match.score)
+            "statusCode": 200,
+            "message": "Face matched successfully",
+            "data": {"face_id": face_id, "similarity": float(match.score)}
+        }
+        
+    def update_face(self, face_id: str, image_data: bytes):
+        # Extract embedding from new image data
+        embedding_response = self.extract_embedding(image_data)
+        
+        if isinstance(embedding_response, dict):
+            if embedding_response.get("statusCode") == 400:
+                return embedding_response
+
+        embedding = embedding_response
+        
+        logger.info(f"New embedding length: {len(embedding)}")
+        
+        # Tạo tên collection để thao tác
+        collection = Collection(self.milvus_client.collection_name)
+        
+        # Tìm kiếm face_id cũ
+        results = collection.search(
+            data=[embedding],
+            anns_field="embedding",
+            param={"metric_type": "COSINE", "params": {"nprobe": 10}},
+            limit=1,
+            output_fields=["face_id"]
+        )
+        
+        # Nếu không tìm thấy hoặc không đủ điểm tương đồng
+        if not results:
+            return {
+                "statusCode": 400,
+                "message": "face_id not found",
+                "data": None
+            }
+
+        # Nếu đã tìm thấy face_id, xóa bản ghi cũ
+        collection.delete(expr=f"face_id == '{face_id}'")
+        
+        # Tạo lại ID mới và timestamp cho face
+        new_face_id = str(uuid.uuid4())
+        created_at = datetime.now()
+        
+        # Thêm dữ liệu mới vào collection
+        collection.insert([
+            [embedding],
+            [new_face_id],
+            [created_at.isoformat()]
+        ])
+        
+        collection.flush()  # Lưu các thay đổi
+        
+        return {
+            "statusCode": 200,
+            "message": "Face updated successfully",
+            "data": {"face_id": new_face_id}
+        }
+        
+    def delete_face_by_id(self, face_id: str):
+        collection = Collection(self.milvus_client.collection_name)
+        
+        # Expression to match the specific face_id
+        expr = f"face_id == '{face_id}'"
+        delete_result = collection.delete(expr)
+        
+        print(f"Delete result: {delete_result}")
+        
+        if delete_result.delete_count > 0:
+            return {
+                "statusCode": 200,
+                "message": f"Face with face_id {face_id} has been deleted from the database",
+                "data": None
+            }
+        else:
+            return {
+                "statusCode": 400,
+                "message": f"Face with face_id {face_id} not found",
+                "data": None
+            }
+
+    def delete_all_faces(self):
+        collection = Collection(self.milvus_client.collection_name)
+        
+        expr = "face_id != ''" 
+        collection.delete(expr)
+        
+        return {
+            "statusCode": 200,
+            "message": "All faces have been deleted from the database",
+            "data": None
         }

@@ -3,9 +3,10 @@ version: '3.5'
 services:
   app:
     container_name: faceid-app
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: faceid-app:latest
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
     env_file:
       - ./.env
     restart: always
