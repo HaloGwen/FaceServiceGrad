@@ -64,3 +64,17 @@ docker run -p 8000:3000 -e MILVUS_URL=0.0.0.0:19530 zilliz/attu
 ```bash
 ssh -R b20dccn460.serveo.net:80:localhost:8001 serveo.net
 ```
+
+## Docker
+
+# Check
+docker ps 
+
+# Stop
+docker compose down
+
+# Rebuild (sau khi sửa code)
+docker build -t faceid-app .
+
+# Build
+docker compose up -d
